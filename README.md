@@ -1,6 +1,7 @@
 # local-toastd
 
 - 設定は `settings.toml` に保存されます。
+- HTTP の待受ホストは `settings.toml` の `[server].bind_host` で変更できます。
 
 ## ローカル環境
 
@@ -19,7 +20,7 @@ Invoke-RestMethod `
   -Method Post `
   -Uri http://127.0.0.1:8765/notify `
   -ContentType 'application/json' `
-  -Body '{"message":"hello from powershell","title":"local-toastd"}'
+  -Body '{"message":"hello from powershell","title":"local-toastd","level":"info"}'
 ```
 
 curl:
@@ -27,10 +28,26 @@ curl:
 ```bash
 curl -X POST http://127.0.0.1:8765/notify \
   -H "Content-Type: application/json" \
-  -d "{\"message\":\"hello from curl\",\"title\":\"local-toastd\"}"
+  -d "{\"message\":\"hello from curl\",\"title\":\"local-toastd\",\"level\":\"info\"}"
 ```
 
 成功時は `202 Accepted` を返し、通知データは内部キューに積まれます。
+
+`settings.toml` 例:
+
+```toml
+[notification]
+theme = "dark"
+sound_type = "taiko"
+duration_seconds = 10.0
+max_visible = 10
+
+[server]
+bind_host = "127.0.0.1"
+port = 8765
+```
+
+`bind_host = "0.0.0.0"` にすると、同一ネットワークや WSL からの到達確認がしやすくなります。変更は再起動後に反映されます。
 
 ## テスト
 

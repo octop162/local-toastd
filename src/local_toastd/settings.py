@@ -23,6 +23,7 @@ SETTINGS_FILE_NAME = "settings.toml"
 class AppSettings:
     theme: ThemeName = "dark"
     sound_type: SoundType = "gentle"
+    bind_host: str = "127.0.0.1"
     port: int = 8765
     duration_seconds: float = 5.0
     max_visible: int = 4
@@ -40,6 +41,7 @@ class AppSettings:
                 "max_visible": self.max_visible,
             },
             "server": {
+                "bind_host": self.bind_host,
                 "port": self.port,
             },
         }
@@ -89,6 +91,7 @@ def _settings_from_data(data: dict[str, Any]) -> AppSettings:
     return AppSettings(
         theme=_coerce_theme(notification.get("theme")),
         sound_type=_coerce_sound_type(notification.get("sound_type")),
+        bind_host=_coerce_bind_host(server.get("bind_host")),
         port=_coerce_port(server.get("port")),
         duration_seconds=_coerce_duration(notification.get("duration_seconds")),
         max_visible=_coerce_max_visible(notification.get("max_visible")),
@@ -116,6 +119,15 @@ def _coerce_port(raw: Any) -> int:
         return raw
     _warn_invalid("port", raw, DEFAULT_SETTINGS.port)
     return DEFAULT_SETTINGS.port
+
+
+def _coerce_bind_host(raw: Any) -> str:
+    if isinstance(raw, str):
+        bind_host = raw.strip()
+        if bind_host:
+            return bind_host
+    _warn_invalid("bind_host", raw, DEFAULT_SETTINGS.bind_host)
+    return DEFAULT_SETTINGS.bind_host
 
 
 def _coerce_duration(raw: Any) -> float:

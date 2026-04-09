@@ -23,6 +23,7 @@ def test_save_and_load_settings_round_trip(tmp_path: Path) -> None:
     expected = AppSettings(
         theme="light",
         sound_type="taiko",
+        bind_host="0.0.0.0",
         port=9999,
         duration_seconds=7.5,
         max_visible=6,
@@ -44,6 +45,7 @@ duration_seconds = -1
 max_visible = 20
 
 [server]
+bind_host = ""
 port = 70000
 """.strip(),
         encoding="utf-8",
@@ -52,6 +54,28 @@ port = 70000
     settings = load_settings(path)
 
     assert settings == DEFAULT_SETTINGS
+
+
+def test_load_settings_reads_bind_host_from_server_section(tmp_path: Path) -> None:
+    path = tmp_path / "settings.toml"
+    path.write_text(
+        """
+[notification]
+theme = "dark"
+sound_type = "gentle"
+duration_seconds = 5.0
+max_visible = 4
+
+[server]
+bind_host = "0.0.0.0"
+port = 8765
+""".strip(),
+        encoding="utf-8",
+    )
+
+    settings = load_settings(path)
+
+    assert settings.bind_host == "0.0.0.0"
 
 
 def test_load_settings_maps_legacy_default_sound_type_to_taiko(tmp_path: Path) -> None:

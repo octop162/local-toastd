@@ -24,9 +24,6 @@ from .sound import play_notification_sound
 
 logger = logging.getLogger(__name__)
 
-HOST = "127.0.0.1"
-
-
 class NotificationBridge(QObject):
     notification_received = Signal(object)
 
@@ -48,7 +45,7 @@ class ToastDaemon(QObject):
         self.resume_action: QAction | None = None
         self.settings_dialog: AppSettingsDialog | None = None
         self.http_server = LocalHttpServer(
-            HOST,
+            self.settings.bind_host,
             self.settings.port,
             self._build_payload_from_http,
             self._receive_from_http,
@@ -152,9 +149,14 @@ class ToastDaemon(QObject):
     def _refresh_tooltip(self) -> None:
         snapshot = self.manager.snapshot()
         status = "一時停止中" if snapshot.paused else "動作中"
-        port_line = f"HTTP: http://{HOST}:{self.http_server.port}"
+        port_line = f"HTTP: http://{self.http_server.host}:{self.http_server.port}"
+        restart_notes: list[str] = []
+        if self.settings.bind_host != self.http_server.host:
+            restart_notes.append(f"設定ホスト: {self.settings.bind_host}")
         if self.settings.port != self.http_server.port:
-            port_line += f"\n設定ポート: {self.settings.port} (再起動後に反映)"
+            restart_notes.append(f"設定ポート: {self.settings.port}")
+        if restart_notes:
+            port_line += "\n" + " / ".join(restart_notes) + " (再起動後に反映)"
         self.tray_icon.setToolTip(
             "local-toastd"
             f" ({status})\n{port_line}\n"

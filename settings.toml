@@ -5,4 +5,5 @@ duration_seconds = 10.0
 max_visible = 10
 
 [server]
+bind_host = "127.0.0.1"
 port = 8765

@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
     QSpinBox,
@@ -28,7 +29,7 @@ def stylesheet_for_theme(theme_name: ThemeName) -> str:
         QLabel {
             color: #0f172a;
         }
-        QComboBox, QSpinBox, QDoubleSpinBox {
+        QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit {
             background-color: #ffffff;
             color: #0f172a;
             border: 1px solid #cbd5e1;
@@ -62,7 +63,7 @@ def stylesheet_for_theme(theme_name: ThemeName) -> str:
     QLabel {
         color: #e2e8f0;
     }
-    QComboBox, QSpinBox, QDoubleSpinBox {
+    QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit {
         background-color: #1e293b;
         color: #f8fafc;
         border: 1px solid #334155;
@@ -98,7 +99,6 @@ class AppSettingsDialog(QDialog):
         self.setWindowTitle("設定")
         self.setModal(False)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
-
         self.theme_combo = QComboBox(self)
         self.theme_combo.addItem("ダーク", "dark")
         self.theme_combo.addItem("ライト", "light")
@@ -112,6 +112,9 @@ class AppSettingsDialog(QDialog):
         self.port_spin = QSpinBox(self)
         self.port_spin.setRange(1, 65535)
 
+        self.host_edit = QLineEdit(self)
+        self.host_edit.setPlaceholderText("127.0.0.1")
+
         self.duration_spin = QDoubleSpinBox(self)
         self.duration_spin.setRange(0.5, 60.0)
         self.duration_spin.setDecimals(1)
@@ -121,7 +124,10 @@ class AppSettingsDialog(QDialog):
         self.max_visible_spin = QSpinBox(self)
         self.max_visible_spin.setRange(1, 10)
 
-        self.note_label = QLabel("ポート番号の変更はアプリ再起動後に反映されます。", self)
+        self.note_label = QLabel(
+            "待受ホストとポート番号の変更はアプリ再起動後に反映されます。",
+            self,
+        )
         self.note_label.setWordWrap(True)
 
         self.test_button = QPushButton("テスト通知", self)
@@ -135,6 +141,7 @@ class AppSettingsDialog(QDialog):
     def set_settings(self, settings: AppSettings) -> None:
         self.theme_combo.setCurrentIndex(self.theme_combo.findData(settings.theme))
         self.sound_combo.setCurrentIndex(self.sound_combo.findData(settings.sound_type))
+        self.host_edit.setText(settings.bind_host)
         self.port_spin.setValue(settings.port)
         self.duration_spin.setValue(settings.duration_seconds)
         self.max_visible_spin.setValue(settings.max_visible)
@@ -146,6 +153,7 @@ class AppSettingsDialog(QDialog):
         return AppSettings(
             theme=theme,
             sound_type=sound_type,
+            bind_host=self.host_edit.text().strip() or "127.0.0.1",
             port=self.port_spin.value(),
             duration_seconds=self.duration_spin.value(),
             max_visible=self.max_visible_spin.value(),
@@ -161,6 +169,7 @@ class AppSettingsDialog(QDialog):
         form_layout = QFormLayout()
         form_layout.addRow("テーマ", self.theme_combo)
         form_layout.addRow("サウンド", self.sound_combo)
+        form_layout.addRow("待受ホスト", self.host_edit)
         form_layout.addRow("ポート", self.port_spin)
         form_layout.addRow("表示時間", self.duration_spin)
         form_layout.addRow("スタック数", self.max_visible_spin)
