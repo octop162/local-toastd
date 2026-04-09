@@ -54,3 +54,13 @@ uv run mypy
 ```powershell
 .\scripts\release.ps1 -Version 0.2.0 -SkipChecks
 ```
+
+## GitHub Release
+
+GitHub では `v0.2.0` のようなタグを push すると、Actions が Windows 向け release zip を作って GitHub Release を自動生成します。
+タグ名の `v` を外した値と `pyproject.toml` の `version` は一致している必要があります。
+
+```powershell
+git tag v0.2.0
+git push origin v0.2.0
+```
