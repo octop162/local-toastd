@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRect, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QCloseEvent, QShowEvent
+from PySide6.QtGui import QCloseEvent, QMouseEvent, QShowEvent
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from .queue_manager import ManagedNotification
@@ -166,6 +166,13 @@ class ToastNotificationWidget(QFrame):
         self._timer.stop()
         self._fade_out.start()
 
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.dismiss()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
     def _emit_dismissed_once(self) -> None:
         if self._dismissed:
             return
@@ -208,6 +215,7 @@ class ToastNotificationWidget(QFrame):
         card = QFrame(self)
         card.setObjectName("toastCard")
         card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        card.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         root_layout.addWidget(card)
 
         card_layout = QHBoxLayout(card)
@@ -217,9 +225,11 @@ class ToastNotificationWidget(QFrame):
         accent_bar = QFrame(card)
         accent_bar.setObjectName("toastAccentBar")
         accent_bar.setFixedWidth(6)
+        accent_bar.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         card_layout.addWidget(accent_bar)
 
         content = QWidget(card)
+        content.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(16, 14, 16, 14)
         content_layout.setSpacing(6)
@@ -228,11 +238,13 @@ class ToastNotificationWidget(QFrame):
             title_label = QLabel(self.notification.payload.title, content)
             title_label.setObjectName("toastTitle")
             title_label.setWordWrap(True)
+            title_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             content_layout.addWidget(title_label)
 
         body_label = QLabel(self.notification.payload.message, content)
         body_label.setObjectName("toastBody")
         body_label.setWordWrap(True)
+        body_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         content_layout.addWidget(body_label)
         card_layout.addWidget(content)
 
