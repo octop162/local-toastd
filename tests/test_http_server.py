@@ -11,7 +11,12 @@ def test_notify_accepts_valid_payload() -> None:
         received.append(payload)
         return len(received)
 
-    server = LocalHttpServer("127.0.0.1", 8765, sink)
+    server = LocalHttpServer(
+        "127.0.0.1",
+        8765,
+        lambda data: NotificationPayload.from_mapping(data, default_duration_ms=9000),
+        sink,
+    )
     client = server.flask_app.test_client()
 
     response = client.post("/notify", json={"message": "hello", "title": "test"})
@@ -19,10 +24,16 @@ def test_notify_accepts_valid_payload() -> None:
     assert response.status_code == 202
     assert response.get_json() == {"status": "accepted", "queue_size": 1}
     assert [item.message for item in received] == ["hello"]
+    assert received[0].duration_ms == 9000
 
 
 def test_notify_rejects_invalid_payload() -> None:
-    server = LocalHttpServer("127.0.0.1", 8765, lambda payload: 1)
+    server = LocalHttpServer(
+        "127.0.0.1",
+        8765,
+        NotificationPayload.from_mapping,
+        lambda payload: 1,
+    )
     client = server.flask_app.test_client()
 
     response = client.post("/notify", json={"title": "missing message"})

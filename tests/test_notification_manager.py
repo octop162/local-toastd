@@ -66,3 +66,34 @@ def test_complete_unknown_notification_raises_key_error() -> None:
 
     with pytest.raises(KeyError, match="Unknown active notification id: 999"):
         manager.complete(999)
+
+
+def test_set_max_visible_promotes_waiting_when_increased() -> None:
+    manager = NotificationManager(max_visible=1)
+
+    manager.enqueue(make_payload("first"))
+    manager.enqueue(make_payload("second"))
+    manager.enqueue(make_payload("third"))
+
+    update = manager.set_max_visible(2)
+
+    assert [item.payload.message for item in update.activated] == ["second"]
+    assert update.snapshot.active_count == 2
+    assert update.snapshot.waiting_count == 1
+    assert update.snapshot.max_visible == 2
+
+
+def test_set_max_visible_moves_overflow_back_to_waiting_when_decreased() -> None:
+    manager = NotificationManager(max_visible=3)
+
+    manager.enqueue(make_payload("first"))
+    manager.enqueue(make_payload("second"))
+    manager.enqueue(make_payload("third"))
+    manager.enqueue(make_payload("fourth"))
+
+    update = manager.set_max_visible(2)
+
+    assert [item.payload.message for item in update.deactivated] == ["third"]
+    assert [item.payload.message for item in update.snapshot.active] == ["first", "second"]
+    assert [item.payload.message for item in update.snapshot.waiting] == ["third", "fourth"]
+    assert update.snapshot.max_visible == 2

@@ -19,9 +19,9 @@ def test_stack_notification_geometries_places_toasts_top_right() -> None:
 
 
 def test_palette_for_level_returns_distinct_visual_tokens() -> None:
-    success = palette_for_level("success")
-    error = palette_for_level("error")
+    success = palette_for_level("dark", "success")
+    error = palette_for_level("light", "error")
 
     assert success.accent == "#22c55e"
-    assert error.accent == "#ef4444"
+    assert error.accent == "#dc2626"
     assert success.background != error.background

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from .queue_manager import ManagedNotification
+from .settings import ThemeName
 
 TOAST_MARGIN = 16
 TOAST_SPACING = 12
@@ -32,40 +33,72 @@ class LevelPalette:
     body: str
 
 
-LEVEL_PALETTES = {
-    "info": LevelPalette(
-        accent="#0ea5e9",
-        background="#0f172a",
-        border="#0369a1",
-        title="#f8fafc",
-        body="#e0f2fe",
-    ),
-    "success": LevelPalette(
-        accent="#22c55e",
-        background="#052e16",
-        border="#15803d",
-        title="#f0fdf4",
-        body="#dcfce7",
-    ),
-    "warning": LevelPalette(
-        accent="#f59e0b",
-        background="#451a03",
-        border="#b45309",
-        title="#fffbeb",
-        body="#fef3c7",
-    ),
-    "error": LevelPalette(
-        accent="#ef4444",
-        background="#450a0a",
-        border="#b91c1c",
-        title="#fef2f2",
-        body="#fee2e2",
-    ),
+THEME_LEVEL_PALETTES: dict[ThemeName, dict[str, LevelPalette]] = {
+    "dark": {
+        "info": LevelPalette(
+            accent="#0ea5e9",
+            background="#0f172a",
+            border="#0369a1",
+            title="#f8fafc",
+            body="#e0f2fe",
+        ),
+        "success": LevelPalette(
+            accent="#22c55e",
+            background="#052e16",
+            border="#15803d",
+            title="#f0fdf4",
+            body="#dcfce7",
+        ),
+        "warning": LevelPalette(
+            accent="#f59e0b",
+            background="#451a03",
+            border="#b45309",
+            title="#fffbeb",
+            body="#fef3c7",
+        ),
+        "error": LevelPalette(
+            accent="#ef4444",
+            background="#450a0a",
+            border="#b91c1c",
+            title="#fef2f2",
+            body="#fee2e2",
+        ),
+    },
+    "light": {
+        "info": LevelPalette(
+            accent="#0284c7",
+            background="#f8fafc",
+            border="#7dd3fc",
+            title="#0f172a",
+            body="#1e3a8a",
+        ),
+        "success": LevelPalette(
+            accent="#16a34a",
+            background="#f0fdf4",
+            border="#86efac",
+            title="#14532d",
+            body="#166534",
+        ),
+        "warning": LevelPalette(
+            accent="#d97706",
+            background="#fffbeb",
+            border="#fcd34d",
+            title="#78350f",
+            body="#92400e",
+        ),
+        "error": LevelPalette(
+            accent="#dc2626",
+            background="#fef2f2",
+            border="#fca5a5",
+            title="#7f1d1d",
+            body="#991b1b",
+        ),
+    },
 }
 
 
-def palette_for_level(level: str) -> LevelPalette:
-    return LEVEL_PALETTES[level]
+def palette_for_level(theme_name: ThemeName, level: str) -> LevelPalette:
+    return THEME_LEVEL_PALETTES[theme_name][level]
 
 
 def stack_notification_geometries(
@@ -92,10 +125,12 @@ class ToastNotificationWidget(QFrame):
     def __init__(
         self,
         notification: ManagedNotification,
+        theme_name: ThemeName,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.notification = notification
+        self.theme_name = theme_name
         self._dismissed = False
         self._visible_once = False
         self._closing = False
@@ -120,6 +155,7 @@ class ToastNotificationWidget(QFrame):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setFixedWidth(TOAST_WIDTH)
         self._build_ui()
+        self.apply_theme(self.theme_name)
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
@@ -145,8 +181,9 @@ class ToastNotificationWidget(QFrame):
         self._dismissed = True
         self.dismissed.emit(self.notification.notification_id)
 
-    def _build_ui(self) -> None:
-        palette = palette_for_level(self.notification.payload.level)
+    def apply_theme(self, theme_name: ThemeName) -> None:
+        self.theme_name = theme_name
+        palette = palette_for_level(self.theme_name, self.notification.payload.level)
         self.setStyleSheet(
             f"""
             QFrame#toastCard {{
@@ -170,6 +207,8 @@ class ToastNotificationWidget(QFrame):
             }}
             """
         )
+
+    def _build_ui(self) -> None:
 
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(0, 0, 0, 0)

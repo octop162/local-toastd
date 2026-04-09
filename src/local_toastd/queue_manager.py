@@ -37,6 +37,7 @@ class NotificationSnapshot:
 class NotificationUpdate:
     snapshot: NotificationSnapshot
     activated: tuple[ManagedNotification, ...] = ()
+    deactivated: tuple[ManagedNotification, ...] = ()
     enqueued: ManagedNotification | None = None
     completed: ManagedNotification | None = None
 
@@ -116,6 +117,20 @@ class NotificationManager:
                 activated=activated,
             )
 
+    def set_max_visible(self, max_visible: int) -> NotificationUpdate:
+        if max_visible <= 0:
+            raise ValueError("max_visible must be a positive integer.")
+
+        with self._lock:
+            self._max_visible = max_visible
+            deactivated = self._trim_active_locked()
+            activated = self._promote_waiting_locked()
+            return NotificationUpdate(
+                snapshot=self._snapshot_locked(),
+                activated=activated,
+                deactivated=deactivated,
+            )
+
     def snapshot(self) -> NotificationSnapshot:
         with self._lock:
             return self._snapshot_locked()
@@ -132,6 +147,15 @@ class NotificationManager:
             self._active.append(notification)
             activated.append(notification)
         return tuple(activated)
+
+    def _trim_active_locked(self) -> tuple[ManagedNotification, ...]:
+        if len(self._active) <= self._max_visible:
+            return ()
+
+        overflow = self._active[self._max_visible :]
+        self._active = self._active[: self._max_visible]
+        self._waiting = deque(overflow + list(self._waiting))
+        return tuple(overflow)
 
     def _snapshot_locked(self) -> NotificationSnapshot:
         return NotificationSnapshot(

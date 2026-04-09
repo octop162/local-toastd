@@ -10,12 +10,20 @@ from .http_server import LocalHttpServer
 from .models import NotificationPayload
 from .notification_ui import ToastNotificationWidget, stack_notification_geometries
 from .queue_manager import ManagedNotification, NotificationManager, NotificationUpdate
+from .settings import (
+    AppSettings,
+    SoundType,
+    ThemeName,
+    load_settings,
+    resolve_settings_path,
+    save_settings,
+)
+from .settings_window import AppSettingsDialog
 from .sound import play_notification_sound
 
 logger = logging.getLogger(__name__)
 
 HOST = "127.0.0.1"
-PORT = 8765
 
 
 class NotificationBridge(QObject):
@@ -27,13 +35,22 @@ class ToastDaemon(QObject):
         super().__init__()
         self.app = app
         self.app.setQuitOnLastWindowClosed(False)
+        self.settings_path = resolve_settings_path()
+        self.settings = load_settings(self.settings_path)
         self.bridge = NotificationBridge()
-        self.manager = NotificationManager(max_visible=4)
+        self.manager = NotificationManager(max_visible=self.settings.max_visible)
         self.active_widgets: dict[int, ToastNotificationWidget] = {}
         self.tray_icon = self._create_tray_icon()
+        self.settings_action: QAction | None = None
         self.pause_action: QAction | None = None
         self.resume_action: QAction | None = None
-        self.http_server = LocalHttpServer(HOST, PORT, self._receive_from_http)
+        self.settings_dialog: AppSettingsDialog | None = None
+        self.http_server = LocalHttpServer(
+            HOST,
+            self.settings.port,
+            self._build_payload_from_http,
+            self._receive_from_http,
+        )
 
         self.bridge.notification_received.connect(self._handle_notification_on_ui_thread)
         self.app.aboutToQuit.connect(self.shutdown)
@@ -43,6 +60,7 @@ class ToastDaemon(QObject):
             raise RuntimeError("System tray is not available on this system.")
 
         self._build_tray_menu()
+        self.tray_icon.activated.connect(self._handle_tray_icon_activated)
         self.tray_icon.show()
         self.http_server.start()
         self._refresh_tooltip()
@@ -73,18 +91,24 @@ class ToastDaemon(QObject):
     def _build_tray_menu(self) -> None:
         menu = QMenu()
 
-        self.pause_action = QAction("Pause notifications", self.app)
+        self.settings_action = QAction("設定...", self.app)
+        self.settings_action.triggered.connect(self.open_settings_dialog)
+        menu.addAction(self.settings_action)
+
+        menu.addSeparator()
+
+        self.pause_action = QAction("通知を一時停止", self.app)
         self.pause_action.triggered.connect(self.pause_notifications)
         menu.addAction(self.pause_action)
 
-        self.resume_action = QAction("Resume notifications", self.app)
+        self.resume_action = QAction("通知を再開", self.app)
         self.resume_action.triggered.connect(self.resume_notifications)
         self.resume_action.setEnabled(False)
         menu.addAction(self.resume_action)
 
         menu.addSeparator()
 
-        quit_action = QAction("Quit", self.app)
+        quit_action = QAction("終了", self.app)
         quit_action.triggered.connect(self.app.quit)
         menu.addAction(quit_action)
 
@@ -120,16 +144,23 @@ class ToastDaemon(QObject):
 
     def _refresh_tooltip(self) -> None:
         snapshot = self.manager.snapshot()
-        status = "paused" if snapshot.paused else "running"
+        status = "一時停止中" if snapshot.paused else "動作中"
+        port_line = f"HTTP: http://{HOST}:{self.http_server.port}"
+        if self.settings.port != self.http_server.port:
+            port_line += f"\n設定ポート: {self.settings.port} (再起動後に反映)"
         self.tray_icon.setToolTip(
             "local-toastd"
-            f" ({status})\nHTTP: http://{HOST}:{PORT}\n"
-            f"Active: {snapshot.active_count}\nWaiting: {snapshot.waiting_count}"
+            f" ({status})\n{port_line}\n"
+            f"表示中: {snapshot.active_count}\n待機中: {snapshot.waiting_count}\n"
+            f"スタック数: {snapshot.max_visible}"
         )
 
     def _apply_notification_update(self, update: NotificationUpdate) -> None:
         if update.completed is not None:
             self._remove_widget(update.completed.notification_id)
+
+        for notification in update.deactivated:
+            self._remove_widget(notification.notification_id)
 
         for notification in update.activated:
             self._ensure_widget(notification)
@@ -141,11 +172,15 @@ class ToastDaemon(QObject):
         if notification.notification_id in self.active_widgets:
             return
 
-        widget = ToastNotificationWidget(notification)
+        widget = ToastNotificationWidget(
+            notification,
+            theme_name=self._theme_for_notification(notification),
+        )
         widget.dismissed.connect(self._dismiss_notification)
         self.active_widgets[notification.notification_id] = widget
         play_notification_sound(
             notification.payload.level,
+            sound_type=self._sound_type_for_notification(notification),
             enabled=notification.payload.sound,
         )
         widget.show()
@@ -194,6 +229,85 @@ class ToastDaemon(QObject):
         geometries = stack_notification_geometries(screen.availableGeometry(), sizes)
         for widget, geometry in zip(ordered_widgets, geometries, strict=False):
             widget.setGeometry(geometry)
+
+    def open_settings_dialog(self) -> None:
+        if self.settings_dialog is not None:
+            self.settings_dialog.raise_()
+            self.settings_dialog.activateWindow()
+            return
+
+        dialog = AppSettingsDialog(self.settings)
+        dialog.save_requested.connect(self._save_settings_from_dialog)
+        dialog.test_requested.connect(self._test_notification_from_dialog)
+        dialog.destroyed.connect(self._on_settings_dialog_destroyed)
+        self.settings_dialog = dialog
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _handle_tray_icon_activated(
+        self,
+        reason: QSystemTrayIcon.ActivationReason,
+    ) -> None:
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self.open_settings_dialog()
+
+    def _on_settings_dialog_destroyed(self) -> None:
+        self.settings_dialog = None
+
+    def _save_settings_from_dialog(self, settings: AppSettings) -> None:
+        try:
+            save_settings(self.settings_path, settings)
+        except OSError as exc:
+            logger.exception("Failed to save settings")
+            if self.settings_dialog is not None:
+                self.settings_dialog.show_error(f"設定の保存に失敗しました: {exc}")
+            return
+
+        self.settings = settings
+        self._apply_runtime_settings()
+        if self.settings_dialog is not None:
+            self.settings_dialog.accept()
+
+    def _test_notification_from_dialog(self, settings: AppSettings) -> None:
+        payload = NotificationPayload(
+            title="テスト通知",
+            message="現在の設定内容をプレビューしています。",
+            level="info",
+            duration_ms=settings.duration_ms,
+            sound=True,
+            theme_override=settings.theme,
+            sound_type_override=settings.sound_type,
+        )
+        self._queue_notification_from_ui(payload)
+
+    def _apply_runtime_settings(self) -> None:
+        update = self.manager.set_max_visible(self.settings.max_visible)
+        self._apply_notification_update(update)
+        self._refresh_active_widget_themes()
+        self._refresh_tooltip()
+
+    def _refresh_active_widget_themes(self) -> None:
+        for widget in self.active_widgets.values():
+            if widget.notification.payload.theme_override is not None:
+                continue
+            widget.apply_theme(self.settings.theme)
+
+    def _queue_notification_from_ui(self, payload: NotificationPayload) -> None:
+        update = self.manager.enqueue(payload)
+        self._handle_notification_on_ui_thread(update)
+
+    def _build_payload_from_http(self, data: object) -> NotificationPayload:
+        return NotificationPayload.from_mapping(
+            data,
+            default_duration_ms=self.settings.duration_ms,
+        )
+
+    def _theme_for_notification(self, notification: ManagedNotification) -> ThemeName:
+        return notification.payload.theme_override or self.settings.theme
+
+    def _sound_type_for_notification(self, notification: ManagedNotification) -> SoundType:
+        return notification.payload.sound_type_override or self.settings.sound_type
 
     def _create_tray_icon(self) -> QSystemTrayIcon:
         pixmap = QPixmap(32, 32)

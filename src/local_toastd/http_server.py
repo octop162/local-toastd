@@ -17,10 +17,12 @@ class LocalHttpServer:
         self,
         host: str,
         port: int,
+        build_payload: Callable[[object], NotificationPayload],
         enqueue_notification: Callable[[NotificationPayload], int],
     ) -> None:
         self.host = host
         self.port = port
+        self._build_payload = build_payload
         self._enqueue_notification = enqueue_notification
         self._server: BaseWSGIServer | None = None
         self._thread: Thread | None = None
@@ -33,7 +35,7 @@ class LocalHttpServer:
         def notify():
             payload_json = request.get_json(silent=True)
             try:
-                payload = NotificationPayload.from_mapping(payload_json or {})
+                payload = self._build_payload(payload_json or {})
             except PayloadValidationError as exc:
                 return jsonify({"status": "error", "error": str(exc)}), 400
 

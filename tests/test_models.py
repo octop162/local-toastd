@@ -19,6 +19,15 @@ def test_notification_payload_defaults() -> None:
     assert payload.sound is True
 
 
+def test_notification_payload_uses_custom_default_duration() -> None:
+    payload = NotificationPayload.from_mapping(
+        {"message": "hello"},
+        default_duration_ms=2500,
+    )
+
+    assert payload.duration_ms == 2500
+
+
 @pytest.mark.parametrize(
     ("raw_payload", "message"),
     [
