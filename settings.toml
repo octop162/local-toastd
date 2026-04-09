@@ -1,0 +1,8 @@
+[notification]
+theme = "dark"
+sound_type = "taiko"
+duration_seconds = 10.0
+max_visible = 10
+
+[server]
+port = 8765

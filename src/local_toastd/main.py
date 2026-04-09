@@ -6,6 +6,7 @@ import sys
 from PySide6.QtWidgets import QApplication
 
 from .app import ToastDaemon
+from .instance_guard import SingleInstanceGuard, show_already_running_message
 
 
 def configure_logging() -> None:
@@ -17,10 +18,19 @@ def configure_logging() -> None:
 
 def main() -> int:
     configure_logging()
+    guard = SingleInstanceGuard()
+    if not guard.acquire():
+        logging.getLogger(__name__).warning("local-toastd is already running")
+        show_already_running_message()
+        return 1
+
     app = QApplication(sys.argv)
-    daemon = ToastDaemon(app)
-    daemon.start()
-    return app.exec()
+    try:
+        daemon = ToastDaemon(app)
+        daemon.start()
+        return app.exec()
+    finally:
+        guard.release()
 
 
 if __name__ == "__main__":

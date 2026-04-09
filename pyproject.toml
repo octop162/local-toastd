@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "Nuitka>=2.6.0",
   "mypy>=1.18.0",
   "pytest>=8.0.0",
   "ruff>=0.13.0",

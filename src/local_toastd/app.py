@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 
 from PySide6.QtCore import QObject, Qt, Signal
-from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from .http_server import LocalHttpServer
+from .icons import load_app_icon
 from .models import NotificationPayload
 from .notification_ui import ToastNotificationWidget, stack_notification_geometries
 from .queue_manager import ManagedNotification, NotificationManager, NotificationUpdate
@@ -35,6 +36,7 @@ class ToastDaemon(QObject):
         super().__init__()
         self.app = app
         self.app.setQuitOnLastWindowClosed(False)
+        self.app.setWindowIcon(load_app_icon())
         self.settings_path = resolve_settings_path()
         self.settings = load_settings(self.settings_path)
         self.bridge = NotificationBridge()
@@ -52,7 +54,12 @@ class ToastDaemon(QObject):
             self._receive_from_http,
         )
 
-        self.bridge.notification_received.connect(self._handle_notification_on_ui_thread)
+        # HTTP callbacks arrive from the Flask worker thread, so force queued delivery
+        # to keep all widget work on the Qt UI thread.
+        self.bridge.notification_received.connect(
+            self._handle_notification_on_ui_thread,
+            Qt.ConnectionType.QueuedConnection,
+        )
         self.app.aboutToQuit.connect(self.shutdown)
 
     def start(self) -> None:
@@ -310,16 +317,4 @@ class ToastDaemon(QObject):
         return notification.payload.sound_type_override or self.settings.sound_type
 
     def _create_tray_icon(self) -> QSystemTrayIcon:
-        pixmap = QPixmap(32, 32)
-        pixmap.fill(Qt.GlobalColor.transparent)
-
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setBrush(QColor("#0ea5e9"))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(2, 2, 28, 28, 8, 8)
-        painter.setBrush(QColor("#f8fafc"))
-        painter.drawEllipse(9, 8, 14, 14)
-        painter.end()
-
-        return QSystemTrayIcon(QIcon(pixmap), self.app)
+        return QSystemTrayIcon(load_app_icon(), self.app)

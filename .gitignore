@@ -3,5 +3,7 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+build/
 *.pyc
 TODO.md
+nuitka-crash-report.xml

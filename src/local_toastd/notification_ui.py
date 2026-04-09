@@ -5,14 +5,7 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRect, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QCloseEvent, QShowEvent
-from PySide6.QtWidgets import (
-    QFrame,
-    QGraphicsOpacityEffect,
-    QHBoxLayout,
-    QLabel,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from .queue_manager import ManagedNotification
 from .settings import ThemeName
@@ -137,9 +130,7 @@ class ToastNotificationWidget(QFrame):
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self.dismiss)
-        self._opacity_effect = QGraphicsOpacityEffect(self)
-        self._opacity_effect.setOpacity(0.0)
-        self.setGraphicsEffect(self._opacity_effect)
+        self.setWindowOpacity(0.0)
         self._fade_in = self._create_animation(0.0, 1.0, FADE_IN_MS)
         self._fade_out = self._create_animation(1.0, 0.0, FADE_OUT_MS)
         self._fade_in.finished.connect(self._start_lifetime_timer)
@@ -251,7 +242,7 @@ class ToastNotificationWidget(QFrame):
         end_value: float,
         duration_ms: int,
     ) -> QPropertyAnimation:
-        animation = QPropertyAnimation(self._opacity_effect, b"opacity", self)
+        animation = QPropertyAnimation(self, b"windowOpacity", self)
         animation.setDuration(duration_ms)
         animation.setStartValue(start_value)
         animation.setEndValue(end_value)
