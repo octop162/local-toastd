@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, TypeAlias
 
@@ -12,21 +12,60 @@ import tomli_w
 logger = logging.getLogger(__name__)
 
 ThemeName: TypeAlias = Literal["dark", "light"]
-SoundType: TypeAlias = Literal["gentle", "taiko", "zangeki", "off"]
+SoundType: TypeAlias = Literal["gentle", "taiko", "zangeki", "scratch", "off"]
+ToastPosition: TypeAlias = Literal["top_right", "top_center", "bottom_right"]
+NotificationLevel: TypeAlias = Literal["info", "success", "warning", "error"]
 
 VALID_THEMES = frozenset({"dark", "light"})
-VALID_SOUND_TYPES = frozenset({"gentle", "taiko", "zangeki", "off"})
+VALID_SOUND_TYPES = frozenset({"gentle", "taiko", "zangeki", "scratch", "off"})
+VALID_POSITIONS = frozenset({"top_right", "top_center", "bottom_right"})
 SETTINGS_FILE_NAME = "settings.toml"
+
+
+@dataclass(frozen=True, slots=True)
+class NotificationSoundSettings:
+    info: SoundType = "gentle"
+    success: SoundType = "gentle"
+    warning: SoundType = "taiko"
+    error: SoundType = "zangeki"
+
+    def to_toml_data(self) -> dict[str, SoundType]:
+        return {
+            "info": self.info,
+            "success": self.success,
+            "warning": self.warning,
+            "error": self.error,
+        }
+
+    def for_level(self, level: str) -> SoundType:
+        if level == "success":
+            return self.success
+        if level == "warning":
+            return self.warning
+        if level == "error":
+            return self.error
+        return self.info
 
 
 @dataclass(frozen=True, slots=True)
 class AppSettings:
     theme: ThemeName = "dark"
-    sound_type: SoundType = "gentle"
+    notification_sounds: NotificationSoundSettings = field(
+        default_factory=NotificationSoundSettings
+    )
+    position: ToastPosition = "top_right"
+    font_size: int = 13
     bind_host: str = "127.0.0.1"
     port: int = 8765
     duration_seconds: float = 5.0
     max_visible: int = 4
+
+    @property
+    def sound_type(self) -> SoundType:
+        return self.notification_sounds.info
+
+    def sound_type_for_level(self, level: str) -> SoundType:
+        return self.notification_sounds.for_level(level)
 
     @property
     def duration_ms(self) -> int:
@@ -36,7 +75,9 @@ class AppSettings:
         return {
             "notification": {
                 "theme": self.theme,
-                "sound_type": self.sound_type,
+                "sound_types": self.notification_sounds.to_toml_data(),
+                "position": self.position,
+                "font_size": self.font_size,
                 "duration_seconds": self.duration_seconds,
                 "max_visible": self.max_visible,
             },
@@ -90,7 +131,12 @@ def _settings_from_data(data: dict[str, Any]) -> AppSettings:
 
     return AppSettings(
         theme=_coerce_theme(notification.get("theme")),
-        sound_type=_coerce_sound_type(notification.get("sound_type")),
+        notification_sounds=_coerce_notification_sounds(
+            notification.get("sound_types"),
+            notification.get("sound_type"),
+        ),
+        position=_coerce_position(notification.get("position")),
+        font_size=_coerce_font_size(notification.get("font_size")),
         bind_host=_coerce_bind_host(server.get("bind_host")),
         port=_coerce_port(server.get("port")),
         duration_seconds=_coerce_duration(notification.get("duration_seconds")),
@@ -105,13 +151,75 @@ def _coerce_theme(raw: Any) -> ThemeName:
     return DEFAULT_SETTINGS.theme
 
 
-def _coerce_sound_type(raw: Any) -> SoundType:
+def _coerce_notification_sounds(
+    raw: Any,
+    legacy_raw: Any,
+) -> NotificationSoundSettings:
+    if isinstance(raw, dict):
+        fallback = NotificationSoundSettings()
+        return NotificationSoundSettings(
+            info=_coerce_sound_type_with_fallback(
+                raw.get("info"),
+                fallback.info,
+                "sound_types.info",
+            ),
+            success=_coerce_sound_type_with_fallback(
+                raw.get("success"),
+                fallback.success,
+                "sound_types.success",
+            ),
+            warning=_coerce_sound_type_with_fallback(
+                raw.get("warning"),
+                fallback.warning,
+                "sound_types.warning",
+            ),
+            error=_coerce_sound_type_with_fallback(
+                raw.get("error"),
+                fallback.error,
+                "sound_types.error",
+            ),
+        )
+
+    if legacy_raw is None:
+        return NotificationSoundSettings()
+    legacy_sound_type: SoundType
+    if legacy_raw == "default":
+        legacy_sound_type = "taiko"
+    elif legacy_raw in VALID_SOUND_TYPES:
+        legacy_sound_type = legacy_raw
+    else:
+        _warn_invalid("sound_type", legacy_raw, NotificationSoundSettings())
+        return NotificationSoundSettings()
+
+    return NotificationSoundSettings(
+        info=legacy_sound_type,
+        success=legacy_sound_type,
+        warning=legacy_sound_type,
+        error=legacy_sound_type,
+    )
+
+
+def _coerce_sound_type_with_fallback(raw: Any, fallback: SoundType, field_name: str) -> SoundType:
     if raw == "default":
         return "taiko"
     if raw in VALID_SOUND_TYPES:
         return raw
-    _warn_invalid("sound_type", raw, DEFAULT_SETTINGS.sound_type)
-    return DEFAULT_SETTINGS.sound_type
+    _warn_invalid(field_name, raw, fallback)
+    return fallback
+
+
+def _coerce_position(raw: Any) -> ToastPosition:
+    if raw in VALID_POSITIONS:
+        return raw
+    _warn_invalid("position", raw, DEFAULT_SETTINGS.position)
+    return DEFAULT_SETTINGS.position
+
+
+def _coerce_font_size(raw: Any) -> int:
+    if isinstance(raw, int) and 10 <= raw <= 25:
+        return raw
+    _warn_invalid("font_size", raw, DEFAULT_SETTINGS.font_size)
+    return DEFAULT_SETTINGS.font_size
 
 
 def _coerce_port(raw: Any) -> int:

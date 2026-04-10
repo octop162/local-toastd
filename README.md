@@ -38,7 +38,9 @@ curl -X POST http://127.0.0.1:8765/notify \
 ```toml
 [notification]
 theme = "dark"
-sound_type = "taiko"
+sound_types = { info = "gentle", success = "scratch", warning = "taiko", error = "zangeki" }
+position = "top_right"
+font_size = 13
 duration_seconds = 10.0
 max_visible = 10
 
@@ -46,8 +48,6 @@ max_visible = 10
 bind_host = "127.0.0.1"
 port = 8765
 ```
-
-`bind_host = "0.0.0.0"` にすると、同一ネットワークや WSL からの到達確認がしやすくなります。変更は再起動後に反映されます。
 
 ## テスト
 

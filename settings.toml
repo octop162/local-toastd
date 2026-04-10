@@ -1,8 +1,15 @@
 [notification]
-theme = "dark"
-sound_type = "taiko"
+theme = "light"
+position = "top_right"
+font_size = 20
 duration_seconds = 10.0
 max_visible = 10
+
+[notification.sound_types]
+info = "zangeki"
+success = "taiko"
+warning = "scratch"
+error = "scratch"
 
 [server]
 bind_host = "127.0.0.1"

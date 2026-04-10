@@ -8,11 +8,12 @@ from PySide6.QtGui import QCloseEvent, QMouseEvent, QShowEvent
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from .queue_manager import ManagedNotification
-from .settings import ThemeName
+from .settings import ThemeName, ToastPosition
 
 TOAST_MARGIN = 16
 TOAST_SPACING = 12
 TOAST_WIDTH = 450
+TITLE_FONT_DELTA = 2
 FADE_IN_MS = 180
 FADE_OUT_MS = 220
 
@@ -97,19 +98,38 @@ def palette_for_level(theme_name: ThemeName, level: str) -> LevelPalette:
 def stack_notification_geometries(
     screen_rect: QRect,
     sizes: Sequence[QSize],
+    position: ToastPosition = "top_right",
     margin: int = TOAST_MARGIN,
     spacing: int = TOAST_SPACING,
 ) -> list[QRect]:
     geometries: list[QRect] = []
-    current_y = screen_rect.y() + margin
-    right_edge = screen_rect.x() + screen_rect.width() - margin
+    if position == "bottom_right":
+        current_y = screen_rect.y() + screen_rect.height() - margin
+        for size in sizes:
+            current_y -= size.height()
+            x = _notification_x(screen_rect, size, position, margin)
+            geometries.append(QRect(x, current_y, size.width(), size.height()))
+            current_y -= spacing
+        return geometries
 
+    current_y = screen_rect.y() + margin
     for size in sizes:
-        x = right_edge - size.width()
+        x = _notification_x(screen_rect, size, position, margin)
         geometries.append(QRect(x, current_y, size.width(), size.height()))
         current_y += size.height() + spacing
 
     return geometries
+
+
+def _notification_x(
+    screen_rect: QRect,
+    size: QSize,
+    position: ToastPosition,
+    margin: int,
+) -> int:
+    if position == "top_center":
+        return screen_rect.x() + (screen_rect.width() - size.width()) // 2
+    return screen_rect.x() + screen_rect.width() - margin - size.width()
 
 
 class ToastNotificationWidget(QFrame):
@@ -119,11 +139,13 @@ class ToastNotificationWidget(QFrame):
         self,
         notification: ManagedNotification,
         theme_name: ThemeName,
+        font_size: int = 13,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.notification = notification
         self.theme_name = theme_name
+        self.font_size = font_size
         self._dismissed = False
         self._visible_once = False
         self._closing = False
@@ -146,7 +168,7 @@ class ToastNotificationWidget(QFrame):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setFixedWidth(TOAST_WIDTH)
         self._build_ui()
-        self.apply_theme(self.theme_name)
+        self.apply_theme(self.theme_name, font_size=self.font_size)
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
@@ -179,9 +201,12 @@ class ToastNotificationWidget(QFrame):
         self._dismissed = True
         self.dismissed.emit(self.notification.notification_id)
 
-    def apply_theme(self, theme_name: ThemeName) -> None:
+    def apply_theme(self, theme_name: ThemeName, *, font_size: int | None = None) -> None:
         self.theme_name = theme_name
+        if font_size is not None:
+            self.font_size = font_size
         palette = palette_for_level(self.theme_name, self.notification.payload.level)
+        title_font_size = self.font_size + TITLE_FONT_DELTA
         self.setStyleSheet(
             f"""
             QFrame#toastCard {{
@@ -196,12 +221,12 @@ class ToastNotificationWidget(QFrame):
             }}
             QLabel#toastTitle {{
                 color: {palette.title};
-                font-size: 15px;
+                font-size: {title_font_size}px;
                 font-weight: 700;
             }}
             QLabel#toastBody {{
                 color: {palette.body};
-                font-size: 13px;
+                font-size: {self.font_size}px;
             }}
             """
         )

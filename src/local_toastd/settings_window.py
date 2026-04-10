@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDoubleSpinBox,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -16,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .settings import AppSettings, ThemeName
+from .settings import AppSettings, NotificationSoundSettings, ThemeName
 
 
 def stylesheet_for_theme(theme_name: ThemeName) -> str:
@@ -28,6 +29,19 @@ def stylesheet_for_theme(theme_name: ThemeName) -> str:
         }
         QLabel {
             color: #0f172a;
+        }
+        QGroupBox {
+            margin-top: 12px;
+            padding: 14px 12px 12px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 12px;
+            padding: 0 6px;
+            color: #334155;
         }
         QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit {
             background-color: #ffffff;
@@ -62,6 +76,19 @@ def stylesheet_for_theme(theme_name: ThemeName) -> str:
     }
     QLabel {
         color: #e2e8f0;
+    }
+    QGroupBox {
+        margin-top: 12px;
+        padding: 14px 12px 12px 12px;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        font-weight: 600;
+    }
+    QGroupBox::title {
+        subcontrol-origin: margin;
+        left: 12px;
+        padding: 0 6px;
+        color: #cbd5e1;
     }
     QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit {
         background-color: #1e293b;
@@ -103,11 +130,19 @@ class AppSettingsDialog(QDialog):
         self.theme_combo.addItem("ダーク", "dark")
         self.theme_combo.addItem("ライト", "light")
 
-        self.sound_combo = QComboBox(self)
-        self.sound_combo.addItem("標準", "gentle")
-        self.sound_combo.addItem("太鼓", "taiko")
-        self.sound_combo.addItem("斬撃", "zangeki")
-        self.sound_combo.addItem("無音", "off")
+        self.info_sound_combo = self._create_sound_combo()
+        self.success_sound_combo = self._create_sound_combo()
+        self.warning_sound_combo = self._create_sound_combo()
+        self.error_sound_combo = self._create_sound_combo()
+
+        self.position_combo = QComboBox(self)
+        self.position_combo.addItem("右上", "top_right")
+        self.position_combo.addItem("中央上", "top_center")
+        self.position_combo.addItem("右下", "bottom_right")
+
+        self.font_size_spin = QSpinBox(self)
+        self.font_size_spin.setRange(10, 25)
+        self.font_size_spin.setSuffix(" px")
 
         self.port_spin = QSpinBox(self)
         self.port_spin.setRange(1, 65535)
@@ -140,7 +175,20 @@ class AppSettingsDialog(QDialog):
 
     def set_settings(self, settings: AppSettings) -> None:
         self.theme_combo.setCurrentIndex(self.theme_combo.findData(settings.theme))
-        self.sound_combo.setCurrentIndex(self.sound_combo.findData(settings.sound_type))
+        self.info_sound_combo.setCurrentIndex(
+            self.info_sound_combo.findData(settings.notification_sounds.info)
+        )
+        self.success_sound_combo.setCurrentIndex(
+            self.success_sound_combo.findData(settings.notification_sounds.success)
+        )
+        self.warning_sound_combo.setCurrentIndex(
+            self.warning_sound_combo.findData(settings.notification_sounds.warning)
+        )
+        self.error_sound_combo.setCurrentIndex(
+            self.error_sound_combo.findData(settings.notification_sounds.error)
+        )
+        self.position_combo.setCurrentIndex(self.position_combo.findData(settings.position))
+        self.font_size_spin.setValue(settings.font_size)
         self.host_edit.setText(settings.bind_host)
         self.port_spin.setValue(settings.port)
         self.duration_spin.setValue(settings.duration_seconds)
@@ -149,10 +197,16 @@ class AppSettingsDialog(QDialog):
 
     def settings_from_form(self) -> AppSettings:
         theme = self.theme_combo.currentData()
-        sound_type = self.sound_combo.currentData()
         return AppSettings(
             theme=theme,
-            sound_type=sound_type,
+            notification_sounds=NotificationSoundSettings(
+                info=self.info_sound_combo.currentData(),
+                success=self.success_sound_combo.currentData(),
+                warning=self.warning_sound_combo.currentData(),
+                error=self.error_sound_combo.currentData(),
+            ),
+            position=self.position_combo.currentData(),
+            font_size=self.font_size_spin.value(),
             bind_host=self.host_edit.text().strip() or "127.0.0.1",
             port=self.port_spin.value(),
             duration_seconds=self.duration_spin.value(),
@@ -166,13 +220,31 @@ class AppSettingsDialog(QDialog):
         self.setStyleSheet(stylesheet_for_theme(theme_name))
 
     def _build_ui(self) -> None:
-        form_layout = QFormLayout()
-        form_layout.addRow("テーマ", self.theme_combo)
-        form_layout.addRow("サウンド", self.sound_combo)
-        form_layout.addRow("待受ホスト", self.host_edit)
-        form_layout.addRow("ポート", self.port_spin)
-        form_layout.addRow("表示時間", self.duration_spin)
-        form_layout.addRow("スタック数", self.max_visible_spin)
+        notification_group = QGroupBox("通知", self)
+        notification_form = QFormLayout(notification_group)
+        notification_form.addRow("テーマ", self.theme_combo)
+        notification_form.addRow("表示時間", self.duration_spin)
+        notification_form.addRow("スタック数", self.max_visible_spin)
+
+        sound_group = QGroupBox("通知音", self)
+        sound_form = QFormLayout(sound_group)
+        sound_form.addRow("情報", self.info_sound_combo)
+        sound_form.addRow("成功", self.success_sound_combo)
+        sound_form.addRow("警告", self.warning_sound_combo)
+        sound_form.addRow("エラー", self.error_sound_combo)
+
+        appearance_group = QGroupBox("表示", self)
+        appearance_form = QFormLayout(appearance_group)
+        appearance_form.addRow("表示位置", self.position_combo)
+        appearance_form.addRow("文字サイズ", self.font_size_spin)
+
+        server_group = QGroupBox("サーバー", self)
+        server_layout = QVBoxLayout(server_group)
+        server_form = QFormLayout()
+        server_form.addRow("待受ホスト", self.host_edit)
+        server_form.addRow("ポート", self.port_spin)
+        server_layout.addLayout(server_form)
+        server_layout.addWidget(self.note_label)
 
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.test_button)
@@ -181,9 +253,20 @@ class AppSettingsDialog(QDialog):
         button_layout.addWidget(self.cancel_button)
 
         root_layout = QVBoxLayout(self)
-        root_layout.addLayout(form_layout)
-        root_layout.addWidget(self.note_label)
+        root_layout.addWidget(notification_group)
+        root_layout.addWidget(sound_group)
+        root_layout.addWidget(appearance_group)
+        root_layout.addWidget(server_group)
         root_layout.addLayout(button_layout)
+
+    def _create_sound_combo(self) -> QComboBox:
+        combo = QComboBox(self)
+        combo.addItem("標準", "gentle")
+        combo.addItem("太鼓", "taiko")
+        combo.addItem("斬撃", "zangeki")
+        combo.addItem("スクラッチ", "scratch")
+        combo.addItem("無音", "off")
+        return combo
 
     def _connect_signals(self) -> None:
         self.theme_combo.currentIndexChanged.connect(self._sync_theme_preview)

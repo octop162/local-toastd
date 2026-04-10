@@ -23,6 +23,7 @@ SOUND_TYPE_FILES = {
     "gentle": "se2.wav",
     "taiko": "se1.wav",
     "zangeki": "se3.wav",
+    "scratch": "se4.wav",
 }
 
 

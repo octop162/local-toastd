@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, QSize, Qt, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
@@ -15,6 +15,7 @@ from .settings import (
     AppSettings,
     SoundType,
     ThemeName,
+    ToastPosition,
     load_settings,
     resolve_settings_path,
     save_settings,
@@ -23,6 +24,7 @@ from .settings_window import AppSettingsDialog
 from .sound import play_notification_sound
 
 logger = logging.getLogger(__name__)
+
 
 class NotificationBridge(QObject):
     notification_received = Signal(object)
@@ -39,6 +41,7 @@ class ToastDaemon(QObject):
         self.bridge = NotificationBridge()
         self.manager = NotificationManager(max_visible=self.settings.max_visible)
         self.active_widgets: dict[int, ToastNotificationWidget] = {}
+        self.notification_settings_overrides: dict[int, AppSettings] = {}
         self.tray_icon = self._create_tray_icon()
         self.settings_action: QAction | None = None
         self.pause_action: QAction | None = None
@@ -184,6 +187,7 @@ class ToastDaemon(QObject):
         widget = ToastNotificationWidget(
             notification,
             theme_name=self._theme_for_notification(notification),
+            font_size=self._font_size_for_notification(notification),
         )
         widget.dismissed.connect(self._dismiss_notification)
         self.active_widgets[notification.notification_id] = widget
@@ -203,6 +207,7 @@ class ToastDaemon(QObject):
 
     def _remove_widget(self, notification_id: int) -> None:
         widget = self.active_widgets.pop(notification_id, None)
+        self.notification_settings_overrides.pop(notification_id, None)
         if widget is None:
             return
         widget.dismissed.disconnect(self._dismiss_notification)
@@ -214,8 +219,11 @@ class ToastDaemon(QObject):
 
     def _restack_widgets(self) -> None:
         snapshot = self.manager.snapshot()
-        ordered_widgets: list[ToastNotificationWidget] = []
-        sizes = []
+        widgets_by_position: dict[ToastPosition, list[tuple[ToastNotificationWidget, QSize]]] = {
+            "top_right": [],
+            "top_center": [],
+            "bottom_right": [],
+        }
 
         for notification in snapshot.active:
             widget = self.active_widgets.get(notification.notification_id)
@@ -225,19 +233,24 @@ class ToastDaemon(QObject):
             size = widget.sizeHint()
             size.setWidth(widget.width())
             widget.resize(size)
-            ordered_widgets.append(widget)
-            sizes.append(size)
-
-        if not ordered_widgets:
-            return
+            position = self._position_for_notification(notification)
+            widgets_by_position[position].append((widget, size))
 
         screen = self.app.primaryScreen()
         if screen is None:
             return
 
-        geometries = stack_notification_geometries(screen.availableGeometry(), sizes)
-        for widget, geometry in zip(ordered_widgets, geometries, strict=False):
-            widget.setGeometry(geometry)
+        for position, widget_entries in widgets_by_position.items():
+            if not widget_entries:
+                continue
+            sizes = [size for _, size in widget_entries]
+            geometries = stack_notification_geometries(
+                screen.availableGeometry(),
+                sizes,
+                position=position,
+            )
+            for (widget, _), geometry in zip(widget_entries, geometries, strict=False):
+                widget.setGeometry(geometry)
 
     def open_settings_dialog(self) -> None:
         if self.settings_dialog is not None:
@@ -286,24 +299,34 @@ class ToastDaemon(QObject):
             duration_ms=settings.duration_ms,
             sound=True,
             theme_override=settings.theme,
-            sound_type_override=settings.sound_type,
         )
-        self._queue_notification_from_ui(payload)
+        self._queue_notification_from_ui(payload, settings_override=settings)
 
     def _apply_runtime_settings(self) -> None:
         update = self.manager.set_max_visible(self.settings.max_visible)
         self._apply_notification_update(update)
-        self._refresh_active_widget_themes()
+        self._refresh_active_widget_appearance()
+        self._restack_widgets()
         self._refresh_tooltip()
 
-    def _refresh_active_widget_themes(self) -> None:
+    def _refresh_active_widget_appearance(self) -> None:
         for widget in self.active_widgets.values():
-            if widget.notification.payload.theme_override is not None:
-                continue
-            widget.apply_theme(self.settings.theme)
+            widget.apply_theme(
+                self._theme_for_notification(widget.notification),
+                font_size=self._font_size_for_notification(widget.notification),
+            )
 
-    def _queue_notification_from_ui(self, payload: NotificationPayload) -> None:
+    def _queue_notification_from_ui(
+        self,
+        payload: NotificationPayload,
+        *,
+        settings_override: AppSettings | None = None,
+    ) -> None:
         update = self.manager.enqueue(payload)
+        if settings_override is not None and update.enqueued is not None:
+            self.notification_settings_overrides[
+                update.enqueued.notification_id
+            ] = settings_override
         self._handle_notification_on_ui_thread(update)
 
     def _build_payload_from_http(self, data: object) -> NotificationPayload:
@@ -316,7 +339,24 @@ class ToastDaemon(QObject):
         return notification.payload.theme_override or self.settings.theme
 
     def _sound_type_for_notification(self, notification: ManagedNotification) -> SoundType:
-        return notification.payload.sound_type_override or self.settings.sound_type
+        if notification.payload.sound_type_override is not None:
+            return notification.payload.sound_type_override
+        override = self.notification_settings_overrides.get(notification.notification_id)
+        if override is not None:
+            return override.sound_type_for_level(notification.payload.level)
+        return self.settings.sound_type_for_level(notification.payload.level)
+
+    def _position_for_notification(self, notification: ManagedNotification) -> ToastPosition:
+        override = self.notification_settings_overrides.get(notification.notification_id)
+        if override is not None:
+            return override.position
+        return self.settings.position
+
+    def _font_size_for_notification(self, notification: ManagedNotification) -> int:
+        override = self.notification_settings_overrides.get(notification.notification_id)
+        if override is not None:
+            return override.font_size
+        return self.settings.font_size
 
     def _create_tray_icon(self) -> QSystemTrayIcon:
         return QSystemTrayIcon(load_app_icon(), self.app)

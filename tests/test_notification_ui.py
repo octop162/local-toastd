@@ -15,7 +15,7 @@ from local_toastd.notification_ui import (
 from local_toastd.queue_manager import ManagedNotification
 
 
-def make_widget() -> ToastNotificationWidget:
+def make_widget(*, font_size: int = 13) -> ToastNotificationWidget:
     payload = NotificationPayload.from_mapping(
         {
             "title": "test",
@@ -24,7 +24,7 @@ def make_widget() -> ToastNotificationWidget:
         }
     )
     notification = ManagedNotification(notification_id=1, payload=payload)
-    return ToastNotificationWidget(notification, theme_name="dark")
+    return ToastNotificationWidget(notification, theme_name="dark", font_size=font_size)
 
 
 def get_app() -> QApplication:
@@ -38,12 +38,55 @@ def test_stack_notification_geometries_places_toasts_top_right() -> None:
     screen = QRect(0, 0, 1920, 1080)
     sizes = [QSize(450, 120), QSize(450, 140), QSize(450, 100)]
 
-    geometries = stack_notification_geometries(screen, sizes, margin=16, spacing=12)
+    geometries = stack_notification_geometries(
+        screen,
+        sizes,
+        position="top_right",
+        margin=16,
+        spacing=12,
+    )
 
     assert [(rect.x(), rect.y(), rect.width(), rect.height()) for rect in geometries] == [
         (1454, 16, 450, 120),
         (1454, 148, 450, 140),
         (1454, 300, 450, 100),
+    ]
+
+
+def test_stack_notification_geometries_places_toasts_top_center() -> None:
+    screen = QRect(0, 0, 1920, 1080)
+    sizes = [QSize(450, 120), QSize(450, 140)]
+
+    geometries = stack_notification_geometries(
+        screen,
+        sizes,
+        position="top_center",
+        margin=16,
+        spacing=12,
+    )
+
+    assert [(rect.x(), rect.y(), rect.width(), rect.height()) for rect in geometries] == [
+        (735, 16, 450, 120),
+        (735, 148, 450, 140),
+    ]
+
+
+def test_stack_notification_geometries_places_toasts_bottom_right() -> None:
+    screen = QRect(0, 0, 1920, 1080)
+    sizes = [QSize(450, 120), QSize(450, 140), QSize(450, 100)]
+
+    geometries = stack_notification_geometries(
+        screen,
+        sizes,
+        position="bottom_right",
+        margin=16,
+        spacing=12,
+    )
+
+    assert [(rect.x(), rect.y(), rect.width(), rect.height()) for rect in geometries] == [
+        (1454, 944, 450, 120),
+        (1454, 792, 450, 140),
+        (1454, 680, 450, 100),
     ]
 
 
@@ -77,6 +120,13 @@ def test_left_click_dismisses_notification_once() -> None:
     app.processEvents()
 
     assert dismissed_ids == [1]
+
+
+def test_apply_theme_updates_font_sizes() -> None:
+    widget = make_widget(font_size=16)
+
+    assert "font-size: 18px;" in widget.styleSheet()
+    assert "font-size: 16px;" in widget.styleSheet()
 
 
 def test_right_click_does_not_dismiss_notification() -> None:
