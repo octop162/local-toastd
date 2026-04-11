@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from local_toastd.settings import (
+    DEFAULT_SETTINGS,
     MAX_FONT_SIZE,
     MAX_MAX_VISIBLE,
-    DEFAULT_SETTINGS,
     AppSettings,
     NotificationSoundSettings,
     load_settings,
