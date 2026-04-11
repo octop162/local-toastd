@@ -22,6 +22,7 @@ def get_app() -> QApplication:
 
 
 def test_settings_dialog_exposes_type_a_to_d_controls() -> None:
+    get_app()
     dialog = AppSettingsDialog(AppSettings())
 
     assert dialog.test_buttons[NOTIFICATION_TYPE_A].text() == "タイプAをテスト"
@@ -63,5 +64,15 @@ def test_settings_dialog_emits_test_request_for_selected_type() -> None:
     emitted_settings, emitted_type = emitted[0]
     assert emitted_type == NOTIFICATION_TYPE_B
     assert emitted_settings.notification_sounds.type_b == "scratch"
+
+    dialog.close()
+
+
+def test_settings_dialog_allows_font_size_up_to_30() -> None:
+    get_app()
+    dialog = AppSettingsDialog(AppSettings())
+
+    assert dialog.font_size_spin.minimum() == 10
+    assert dialog.font_size_spin.maximum() == 30
 
     dialog.close()

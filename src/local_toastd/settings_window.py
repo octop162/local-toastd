@@ -18,7 +18,13 @@ from PySide6.QtWidgets import (
 )
 
 from .notification_types import NOTIFICATION_TYPES, NotificationType, display_label_for_type
-from .settings import AppSettings, NotificationSoundSettings, ThemeName
+from .settings import (
+    MAX_FONT_SIZE,
+    MIN_FONT_SIZE,
+    AppSettings,
+    NotificationSoundSettings,
+    ThemeName,
+)
 
 
 def stylesheet_for_theme(theme_name: ThemeName) -> str:
@@ -142,7 +148,7 @@ class AppSettingsDialog(QDialog):
         self.position_combo.addItem("右下", "bottom_right")
 
         self.font_size_spin = QSpinBox(self)
-        self.font_size_spin.setRange(10, 25)
+        self.font_size_spin.setRange(MIN_FONT_SIZE, MAX_FONT_SIZE)
         self.font_size_spin.setSuffix(" px")
 
         self.port_spin = QSpinBox(self)

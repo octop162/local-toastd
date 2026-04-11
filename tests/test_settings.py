@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from local_toastd.settings import (
+    MAX_FONT_SIZE,
     DEFAULT_SETTINGS,
     AppSettings,
     NotificationSoundSettings,
@@ -96,6 +97,29 @@ port = 8765
         type_c="taiko",
         type_d="off",
     )
+
+
+def test_load_settings_accepts_font_size_up_to_30(tmp_path: Path) -> None:
+    path = tmp_path / "settings.toml"
+    path.write_text(
+        """
+[notification]
+theme = "dark"
+sound_types = { type_a = "gentle", type_b = "gentle", type_c = "taiko", type_d = "zangeki" }
+position = "top_right"
+font_size = 30
+duration_seconds = 5.0
+max_visible = 4
+
+[server]
+port = 8765
+""".strip(),
+        encoding="utf-8",
+    )
+
+    settings = load_settings(path)
+
+    assert settings.font_size == MAX_FONT_SIZE
 
 
 def test_load_settings_falls_back_when_legacy_sound_keys_are_used(tmp_path: Path) -> None:

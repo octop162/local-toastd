@@ -15,11 +15,12 @@ from .notification_types import (
     NotificationType,
 )
 from .queue_manager import ManagedNotification
-from .settings import ThemeName, ToastPosition
+from .settings import DEFAULT_FONT_SIZE, ThemeName, ToastPosition
 
 TOAST_MARGIN = 16
 TOAST_SPACING = 12
-TOAST_WIDTH = 450
+TOAST_BASE_WIDTH = 450
+TOAST_WIDTH_PER_FONT_SIZE = 24
 TITLE_FONT_DELTA = 2
 FADE_IN_MS = 180
 FADE_OUT_MS = 220
@@ -102,6 +103,10 @@ def palette_for_type(theme_name: ThemeName, notification_type: NotificationType)
     return THEME_TYPE_PALETTES[theme_name][notification_type]
 
 
+def toast_width_for_font_size(font_size: int) -> int:
+    return TOAST_BASE_WIDTH + ((font_size - DEFAULT_FONT_SIZE) * TOAST_WIDTH_PER_FONT_SIZE)
+
+
 def stack_notification_geometries(
     screen_rect: QRect,
     sizes: Sequence[QSize],
@@ -173,7 +178,7 @@ class ToastNotificationWidget(QFrame):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setFixedWidth(TOAST_WIDTH)
+        self._sync_width()
         self._build_ui()
         self.apply_theme(self.theme_name, font_size=self.font_size)
 
@@ -212,6 +217,7 @@ class ToastNotificationWidget(QFrame):
         self.theme_name = theme_name
         if font_size is not None:
             self.font_size = font_size
+        self._sync_width()
         palette = palette_for_type(
             self.theme_name,
             self.notification.payload.notification_type,
@@ -295,6 +301,9 @@ class ToastNotificationWidget(QFrame):
         animation.setEndValue(end_value)
         animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         return animation
+
+    def _sync_width(self) -> None:
+        self.setFixedWidth(toast_width_for_font_size(self.font_size))
 
     def _start_lifetime_timer(self) -> None:
         self._timer.start(self.notification.payload.duration_ms)

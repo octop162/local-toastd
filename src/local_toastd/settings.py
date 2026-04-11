@@ -27,6 +27,9 @@ VALID_THEMES = frozenset({"dark", "light"})
 VALID_SOUND_TYPES = frozenset({"gentle", "taiko", "zangeki", "scratch", "off"})
 VALID_POSITIONS = frozenset({"top_right", "top_center", "bottom_right"})
 SETTINGS_FILE_NAME = "settings.toml"
+MIN_FONT_SIZE = 10
+MAX_FONT_SIZE = 30
+DEFAULT_FONT_SIZE = 13
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,7 +64,7 @@ class AppSettings:
         default_factory=NotificationSoundSettings
     )
     position: ToastPosition = "top_right"
-    font_size: int = 13
+    font_size: int = DEFAULT_FONT_SIZE
     bind_host: str = "127.0.0.1"
     port: int = 8765
     duration_seconds: float = 5.0
@@ -208,7 +211,7 @@ def _coerce_position(raw: Any) -> ToastPosition:
 
 
 def _coerce_font_size(raw: Any) -> int:
-    if isinstance(raw, int) and 10 <= raw <= 25:
+    if isinstance(raw, int) and MIN_FONT_SIZE <= raw <= MAX_FONT_SIZE:
         return raw
     _warn_invalid("font_size", raw, DEFAULT_SETTINGS.font_size)
     return DEFAULT_SETTINGS.font_size

@@ -12,6 +12,7 @@ from local_toastd.notification_ui import (
     ToastNotificationWidget,
     palette_for_type,
     stack_notification_geometries,
+    toast_width_for_font_size,
 )
 from local_toastd.queue_manager import ManagedNotification
 
@@ -128,6 +129,16 @@ def test_apply_theme_updates_font_sizes() -> None:
 
     assert "font-size: 18px;" in widget.styleSheet()
     assert "font-size: 16px;" in widget.styleSheet()
+    assert widget.width() == toast_width_for_font_size(16)
+
+
+def test_toast_width_scales_with_font_size() -> None:
+    small = toast_width_for_font_size(13)
+    large = toast_width_for_font_size(30)
+
+    assert small == 450
+    assert large == 858
+    assert large > small
 
 
 def test_right_click_does_not_dismiss_notification() -> None:
