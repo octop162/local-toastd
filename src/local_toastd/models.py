@@ -8,8 +8,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .settings import SoundType, ThemeName
 
+from .notification_types import (
+    DEFAULT_NOTIFICATION_TYPE,
+    VALID_NOTIFICATION_TYPES,
+    NotificationType,
+)
+
 DEFAULT_DURATION_MS = 5000
-VALID_LEVELS = frozenset({"info", "success", "warning", "error"})
 
 
 class PayloadValidationError(ValueError):
@@ -20,7 +25,7 @@ class PayloadValidationError(ValueError):
 class NotificationPayload:
     message: str
     title: str | None = None
-    level: str = "info"
+    notification_type: NotificationType = DEFAULT_NOTIFICATION_TYPE
     duration_ms: int = DEFAULT_DURATION_MS
     sound: bool = True
     theme_override: ThemeName | None = None
@@ -49,10 +54,18 @@ class NotificationPayload:
                 raise PayloadValidationError("'title' must be a string when provided.")
             title = title.strip() or None
 
-        level = data.get("level", "info")
-        if not isinstance(level, str) or level not in VALID_LEVELS:
+        if "level" in data:
             raise PayloadValidationError(
-                f"'level' must be one of: {', '.join(sorted(VALID_LEVELS))}."
+                "'level' is no longer supported. Use 'type' instead."
+            )
+
+        notification_type = data.get("type", DEFAULT_NOTIFICATION_TYPE)
+        if (
+            not isinstance(notification_type, str)
+            or notification_type not in VALID_NOTIFICATION_TYPES
+        ):
+            raise PayloadValidationError(
+                f"'type' must be one of: {', '.join(sorted(VALID_NOTIFICATION_TYPES))}."
             )
 
         duration_ms = data.get("duration_ms", default_duration_ms)
@@ -66,7 +79,7 @@ class NotificationPayload:
         return cls(
             message=message.strip(),
             title=title,
-            level=level,
+            notification_type=notification_type,
             duration_ms=duration_ms,
             sound=sound,
         )

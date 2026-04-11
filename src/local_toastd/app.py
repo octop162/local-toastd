@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 from .http_server import LocalHttpServer
 from .icons import load_app_icon
 from .models import NotificationPayload
+from .notification_types import NotificationType, display_label_for_type
 from .notification_ui import ToastNotificationWidget, stack_notification_geometries
 from .queue_manager import ManagedNotification, NotificationManager, NotificationUpdate
 from .settings import (
@@ -192,7 +193,6 @@ class ToastDaemon(QObject):
         widget.dismissed.connect(self._dismiss_notification)
         self.active_widgets[notification.notification_id] = widget
         play_notification_sound(
-            notification.payload.level,
             sound_type=self._sound_type_for_notification(notification),
             enabled=notification.payload.sound,
         )
@@ -291,11 +291,16 @@ class ToastDaemon(QObject):
         if self.settings_dialog is not None:
             self.settings_dialog.accept()
 
-    def _test_notification_from_dialog(self, settings: AppSettings) -> None:
+    def _test_notification_from_dialog(
+        self,
+        settings: AppSettings,
+        notification_type: NotificationType,
+    ) -> None:
+        label = display_label_for_type(notification_type)
         payload = NotificationPayload(
-            title="テスト通知",
+            title=f"テスト通知（{label}）",
             message="現在の設定内容をプレビューしています。",
-            level="info",
+            notification_type=notification_type,
             duration_ms=settings.duration_ms,
             sound=True,
             theme_override=settings.theme,
@@ -343,8 +348,12 @@ class ToastDaemon(QObject):
             return notification.payload.sound_type_override
         override = self.notification_settings_overrides.get(notification.notification_id)
         if override is not None:
-            return override.sound_type_for_level(notification.payload.level)
-        return self.settings.sound_type_for_level(notification.payload.level)
+            return override.sound_type_for_notification_type(
+                notification.payload.notification_type
+            )
+        return self.settings.sound_type_for_notification_type(
+            notification.payload.notification_type
+        )
 
     def _position_for_notification(self, notification: ManagedNotification) -> ToastPosition:
         override = self.notification_settings_overrides.get(notification.notification_id)

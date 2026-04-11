@@ -20,7 +20,7 @@ Invoke-RestMethod `
   -Method Post `
   -Uri http://127.0.0.1:8765/notify `
   -ContentType 'application/json' `
-  -Body '{"message":"hello from powershell","title":"local-toastd","level":"info"}'
+  -Body '{"message":"hello from powershell","title":"local-toastd","type":"type_a"}'
 ```
 
 curl:
@@ -28,7 +28,7 @@ curl:
 ```bash
 curl -X POST http://127.0.0.1:8765/notify \
   -H "Content-Type: application/json" \
-  -d "{\"message\":\"hello from curl\",\"title\":\"local-toastd\",\"level\":\"info\"}"
+  -d "{\"message\":\"hello from curl\",\"title\":\"local-toastd\",\"type\":\"type_a\"}"
 ```
 
 成功時は `202 Accepted` を返し、通知データは内部キューに積まれます。
@@ -38,7 +38,7 @@ curl -X POST http://127.0.0.1:8765/notify \
 ```toml
 [notification]
 theme = "dark"
-sound_types = { info = "gentle", success = "scratch", warning = "taiko", error = "zangeki" }
+sound_types = { type_a = "gentle", type_b = "scratch", type_c = "taiko", type_d = "zangeki" }
 position = "top_right"
 font_size = 13
 duration_seconds = 10.0

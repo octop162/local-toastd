@@ -7,6 +7,13 @@ from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRect, QSize, Qt, Q
 from PySide6.QtGui import QCloseEvent, QMouseEvent, QShowEvent
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
+from .notification_types import (
+    NOTIFICATION_TYPE_A,
+    NOTIFICATION_TYPE_B,
+    NOTIFICATION_TYPE_C,
+    NOTIFICATION_TYPE_D,
+    NotificationType,
+)
 from .queue_manager import ManagedNotification
 from .settings import ThemeName, ToastPosition
 
@@ -27,30 +34,30 @@ class LevelPalette:
     body: str
 
 
-THEME_LEVEL_PALETTES: dict[ThemeName, dict[str, LevelPalette]] = {
+THEME_TYPE_PALETTES: dict[ThemeName, dict[NotificationType, LevelPalette]] = {
     "dark": {
-        "info": LevelPalette(
+        NOTIFICATION_TYPE_A: LevelPalette(
             accent="#0ea5e9",
             background="#0f172a",
             border="#0369a1",
             title="#f8fafc",
             body="#e0f2fe",
         ),
-        "success": LevelPalette(
+        NOTIFICATION_TYPE_B: LevelPalette(
             accent="#22c55e",
             background="#052e16",
             border="#15803d",
             title="#f0fdf4",
             body="#dcfce7",
         ),
-        "warning": LevelPalette(
+        NOTIFICATION_TYPE_C: LevelPalette(
             accent="#f59e0b",
             background="#451a03",
             border="#b45309",
             title="#fffbeb",
             body="#fef3c7",
         ),
-        "error": LevelPalette(
+        NOTIFICATION_TYPE_D: LevelPalette(
             accent="#ef4444",
             background="#450a0a",
             border="#b91c1c",
@@ -59,28 +66,28 @@ THEME_LEVEL_PALETTES: dict[ThemeName, dict[str, LevelPalette]] = {
         ),
     },
     "light": {
-        "info": LevelPalette(
+        NOTIFICATION_TYPE_A: LevelPalette(
             accent="#0284c7",
             background="#f8fafc",
             border="#7dd3fc",
             title="#0f172a",
             body="#1e3a8a",
         ),
-        "success": LevelPalette(
+        NOTIFICATION_TYPE_B: LevelPalette(
             accent="#16a34a",
             background="#f0fdf4",
             border="#86efac",
             title="#14532d",
             body="#166534",
         ),
-        "warning": LevelPalette(
+        NOTIFICATION_TYPE_C: LevelPalette(
             accent="#d97706",
             background="#fffbeb",
             border="#fcd34d",
             title="#78350f",
             body="#92400e",
         ),
-        "error": LevelPalette(
+        NOTIFICATION_TYPE_D: LevelPalette(
             accent="#dc2626",
             background="#fef2f2",
             border="#fca5a5",
@@ -91,8 +98,8 @@ THEME_LEVEL_PALETTES: dict[ThemeName, dict[str, LevelPalette]] = {
 }
 
 
-def palette_for_level(theme_name: ThemeName, level: str) -> LevelPalette:
-    return THEME_LEVEL_PALETTES[theme_name][level]
+def palette_for_type(theme_name: ThemeName, notification_type: NotificationType) -> LevelPalette:
+    return THEME_TYPE_PALETTES[theme_name][notification_type]
 
 
 def stack_notification_geometries(
@@ -205,7 +212,10 @@ class ToastNotificationWidget(QFrame):
         self.theme_name = theme_name
         if font_size is not None:
             self.font_size = font_size
-        palette = palette_for_level(self.theme_name, self.notification.payload.level)
+        palette = palette_for_type(
+            self.theme_name,
+            self.notification.payload.notification_type,
+        )
         title_font_size = self.font_size + TITLE_FONT_DELTA
         self.setStyleSheet(
             f"""

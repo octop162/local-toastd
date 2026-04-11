@@ -9,12 +9,19 @@ from typing import Any, Literal, TypeAlias
 import tomli
 import tomli_w
 
+from .notification_types import (
+    NOTIFICATION_TYPE_A,
+    NOTIFICATION_TYPE_B,
+    NOTIFICATION_TYPE_C,
+    NOTIFICATION_TYPE_D,
+    NotificationType,
+)
+
 logger = logging.getLogger(__name__)
 
 ThemeName: TypeAlias = Literal["dark", "light"]
 SoundType: TypeAlias = Literal["gentle", "taiko", "zangeki", "scratch", "off"]
 ToastPosition: TypeAlias = Literal["top_right", "top_center", "bottom_right"]
-NotificationLevel: TypeAlias = Literal["info", "success", "warning", "error"]
 
 VALID_THEMES = frozenset({"dark", "light"})
 VALID_SOUND_TYPES = frozenset({"gentle", "taiko", "zangeki", "scratch", "off"})
@@ -24,27 +31,27 @@ SETTINGS_FILE_NAME = "settings.toml"
 
 @dataclass(frozen=True, slots=True)
 class NotificationSoundSettings:
-    info: SoundType = "gentle"
-    success: SoundType = "gentle"
-    warning: SoundType = "taiko"
-    error: SoundType = "zangeki"
+    type_a: SoundType = "gentle"
+    type_b: SoundType = "gentle"
+    type_c: SoundType = "taiko"
+    type_d: SoundType = "zangeki"
 
     def to_toml_data(self) -> dict[str, SoundType]:
         return {
-            "info": self.info,
-            "success": self.success,
-            "warning": self.warning,
-            "error": self.error,
+            NOTIFICATION_TYPE_A: self.type_a,
+            NOTIFICATION_TYPE_B: self.type_b,
+            NOTIFICATION_TYPE_C: self.type_c,
+            NOTIFICATION_TYPE_D: self.type_d,
         }
 
-    def for_level(self, level: str) -> SoundType:
-        if level == "success":
-            return self.success
-        if level == "warning":
-            return self.warning
-        if level == "error":
-            return self.error
-        return self.info
+    def for_type(self, notification_type: NotificationType) -> SoundType:
+        if notification_type == NOTIFICATION_TYPE_B:
+            return self.type_b
+        if notification_type == NOTIFICATION_TYPE_C:
+            return self.type_c
+        if notification_type == NOTIFICATION_TYPE_D:
+            return self.type_d
+        return self.type_a
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,10 +69,13 @@ class AppSettings:
 
     @property
     def sound_type(self) -> SoundType:
-        return self.notification_sounds.info
+        return self.notification_sounds.type_a
 
-    def sound_type_for_level(self, level: str) -> SoundType:
-        return self.notification_sounds.for_level(level)
+    def sound_type_for_notification_type(
+        self,
+        notification_type: NotificationType,
+    ) -> SoundType:
+        return self.notification_sounds.for_type(notification_type)
 
     @property
     def duration_ms(self) -> int:
@@ -131,10 +141,7 @@ def _settings_from_data(data: dict[str, Any]) -> AppSettings:
 
     return AppSettings(
         theme=_coerce_theme(notification.get("theme")),
-        notification_sounds=_coerce_notification_sounds(
-            notification.get("sound_types"),
-            notification.get("sound_type"),
-        ),
+        notification_sounds=_coerce_notification_sounds(notification.get("sound_types")),
         position=_coerce_position(notification.get("position")),
         font_size=_coerce_font_size(notification.get("font_size")),
         bind_host=_coerce_bind_host(server.get("bind_host")),
@@ -151,52 +158,37 @@ def _coerce_theme(raw: Any) -> ThemeName:
     return DEFAULT_SETTINGS.theme
 
 
-def _coerce_notification_sounds(
-    raw: Any,
-    legacy_raw: Any,
-) -> NotificationSoundSettings:
+def _coerce_notification_sounds(raw: Any) -> NotificationSoundSettings:
     if isinstance(raw, dict):
         fallback = NotificationSoundSettings()
         return NotificationSoundSettings(
-            info=_coerce_sound_type_with_fallback(
-                raw.get("info"),
-                fallback.info,
-                "sound_types.info",
+            type_a=_coerce_sound_type_with_fallback(
+                raw.get(NOTIFICATION_TYPE_A),
+                fallback.type_a,
+                f"sound_types.{NOTIFICATION_TYPE_A}",
             ),
-            success=_coerce_sound_type_with_fallback(
-                raw.get("success"),
-                fallback.success,
-                "sound_types.success",
+            type_b=_coerce_sound_type_with_fallback(
+                raw.get(NOTIFICATION_TYPE_B),
+                fallback.type_b,
+                f"sound_types.{NOTIFICATION_TYPE_B}",
             ),
-            warning=_coerce_sound_type_with_fallback(
-                raw.get("warning"),
-                fallback.warning,
-                "sound_types.warning",
+            type_c=_coerce_sound_type_with_fallback(
+                raw.get(NOTIFICATION_TYPE_C),
+                fallback.type_c,
+                f"sound_types.{NOTIFICATION_TYPE_C}",
             ),
-            error=_coerce_sound_type_with_fallback(
-                raw.get("error"),
-                fallback.error,
-                "sound_types.error",
+            type_d=_coerce_sound_type_with_fallback(
+                raw.get(NOTIFICATION_TYPE_D),
+                fallback.type_d,
+                f"sound_types.{NOTIFICATION_TYPE_D}",
             ),
         )
 
-    if legacy_raw is None:
-        return NotificationSoundSettings()
-    legacy_sound_type: SoundType
-    if legacy_raw == "default":
-        legacy_sound_type = "taiko"
-    elif legacy_raw in VALID_SOUND_TYPES:
-        legacy_sound_type = legacy_raw
-    else:
-        _warn_invalid("sound_type", legacy_raw, NotificationSoundSettings())
+    if raw is None:
         return NotificationSoundSettings()
 
-    return NotificationSoundSettings(
-        info=legacy_sound_type,
-        success=legacy_sound_type,
-        warning=legacy_sound_type,
-        error=legacy_sound_type,
-    )
+    _warn_invalid("sound_types", raw, NotificationSoundSettings())
+    return NotificationSoundSettings()
 
 
 def _coerce_sound_type_with_fallback(raw: Any, fallback: SoundType, field_name: str) -> SoundType:

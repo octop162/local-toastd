@@ -24,10 +24,10 @@ def test_save_and_load_settings_round_trip(tmp_path: Path) -> None:
     expected = AppSettings(
         theme="light",
         notification_sounds=NotificationSoundSettings(
-            info="gentle",
-            success="scratch",
-            warning="taiko",
-            error="zangeki",
+            type_a="gentle",
+            type_b="scratch",
+            type_c="taiko",
+            type_d="zangeki",
         ),
         position="bottom_right",
         font_size=18,
@@ -72,7 +72,7 @@ def test_load_settings_reads_bind_host_from_server_section(tmp_path: Path) -> No
         """
 [notification]
 theme = "dark"
-sound_types = { info = "gentle", success = "scratch", warning = "taiko", error = "off" }
+sound_types = { type_a = "gentle", type_b = "scratch", type_c = "taiko", type_d = "off" }
 position = "top_center"
 font_size = 16
 duration_seconds = 5.0
@@ -91,20 +91,20 @@ port = 8765
     assert settings.position == "top_center"
     assert settings.font_size == 16
     assert settings.notification_sounds == NotificationSoundSettings(
-        info="gentle",
-        success="scratch",
-        warning="taiko",
-        error="off",
+        type_a="gentle",
+        type_b="scratch",
+        type_c="taiko",
+        type_d="off",
     )
 
 
-def test_load_settings_maps_legacy_default_sound_type_to_taiko(tmp_path: Path) -> None:
+def test_load_settings_falls_back_when_legacy_sound_keys_are_used(tmp_path: Path) -> None:
     path = tmp_path / "settings.toml"
     path.write_text(
         """
 [notification]
 theme = "dark"
-sound_type = "default"
+sound_types = { info = "taiko", success = "taiko", warning = "taiko", error = "taiko" }
 position = "top_right"
 font_size = 13
 duration_seconds = 5.0
@@ -118,12 +118,7 @@ port = 8765
 
     settings = load_settings(path)
 
-    assert settings.notification_sounds == NotificationSoundSettings(
-        info="taiko",
-        success="taiko",
-        warning="taiko",
-        error="taiko",
-    )
+    assert settings.notification_sounds == NotificationSoundSettings()
 
 
 def test_resolve_settings_path_uses_project_root_in_dev_mode(tmp_path: Path) -> None:

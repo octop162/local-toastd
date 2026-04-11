@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .notification_types import NOTIFICATION_TYPES, NotificationType, display_label_for_type
 from .settings import AppSettings, NotificationSoundSettings, ThemeName
 
 
@@ -119,7 +120,7 @@ def stylesheet_for_theme(theme_name: ThemeName) -> str:
 
 class AppSettingsDialog(QDialog):
     save_requested = Signal(object)
-    test_requested = Signal(object)
+    test_requested = Signal(object, str)
 
     def __init__(self, settings: AppSettings, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -130,10 +131,10 @@ class AppSettingsDialog(QDialog):
         self.theme_combo.addItem("ダーク", "dark")
         self.theme_combo.addItem("ライト", "light")
 
-        self.info_sound_combo = self._create_sound_combo()
-        self.success_sound_combo = self._create_sound_combo()
-        self.warning_sound_combo = self._create_sound_combo()
-        self.error_sound_combo = self._create_sound_combo()
+        self.sound_combos: dict[NotificationType, QComboBox] = {
+            notification_type: self._create_sound_combo()
+            for notification_type in NOTIFICATION_TYPES
+        }
 
         self.position_combo = QComboBox(self)
         self.position_combo.addItem("右上", "top_right")
@@ -165,7 +166,13 @@ class AppSettingsDialog(QDialog):
         )
         self.note_label.setWordWrap(True)
 
-        self.test_button = QPushButton("テスト通知", self)
+        self.test_buttons: dict[NotificationType, QPushButton] = {
+            notification_type: QPushButton(
+                f"{display_label_for_type(notification_type)}をテスト",
+                self,
+            )
+            for notification_type in NOTIFICATION_TYPES
+        }
         self.save_button = QPushButton("保存", self)
         self.cancel_button = QPushButton("キャンセル", self)
 
@@ -175,17 +182,17 @@ class AppSettingsDialog(QDialog):
 
     def set_settings(self, settings: AppSettings) -> None:
         self.theme_combo.setCurrentIndex(self.theme_combo.findData(settings.theme))
-        self.info_sound_combo.setCurrentIndex(
-            self.info_sound_combo.findData(settings.notification_sounds.info)
+        self.sound_combos["type_a"].setCurrentIndex(
+            self.sound_combos["type_a"].findData(settings.notification_sounds.type_a)
         )
-        self.success_sound_combo.setCurrentIndex(
-            self.success_sound_combo.findData(settings.notification_sounds.success)
+        self.sound_combos["type_b"].setCurrentIndex(
+            self.sound_combos["type_b"].findData(settings.notification_sounds.type_b)
         )
-        self.warning_sound_combo.setCurrentIndex(
-            self.warning_sound_combo.findData(settings.notification_sounds.warning)
+        self.sound_combos["type_c"].setCurrentIndex(
+            self.sound_combos["type_c"].findData(settings.notification_sounds.type_c)
         )
-        self.error_sound_combo.setCurrentIndex(
-            self.error_sound_combo.findData(settings.notification_sounds.error)
+        self.sound_combos["type_d"].setCurrentIndex(
+            self.sound_combos["type_d"].findData(settings.notification_sounds.type_d)
         )
         self.position_combo.setCurrentIndex(self.position_combo.findData(settings.position))
         self.font_size_spin.setValue(settings.font_size)
@@ -200,10 +207,10 @@ class AppSettingsDialog(QDialog):
         return AppSettings(
             theme=theme,
             notification_sounds=NotificationSoundSettings(
-                info=self.info_sound_combo.currentData(),
-                success=self.success_sound_combo.currentData(),
-                warning=self.warning_sound_combo.currentData(),
-                error=self.error_sound_combo.currentData(),
+                type_a=self.sound_combos["type_a"].currentData(),
+                type_b=self.sound_combos["type_b"].currentData(),
+                type_c=self.sound_combos["type_c"].currentData(),
+                type_d=self.sound_combos["type_d"].currentData(),
             ),
             position=self.position_combo.currentData(),
             font_size=self.font_size_spin.value(),
@@ -228,10 +235,11 @@ class AppSettingsDialog(QDialog):
 
         sound_group = QGroupBox("通知音", self)
         sound_form = QFormLayout(sound_group)
-        sound_form.addRow("情報", self.info_sound_combo)
-        sound_form.addRow("成功", self.success_sound_combo)
-        sound_form.addRow("警告", self.warning_sound_combo)
-        sound_form.addRow("エラー", self.error_sound_combo)
+        for notification_type in NOTIFICATION_TYPES:
+            sound_form.addRow(
+                display_label_for_type(notification_type),
+                self.sound_combos[notification_type],
+            )
 
         appearance_group = QGroupBox("表示", self)
         appearance_form = QFormLayout(appearance_group)
@@ -247,7 +255,8 @@ class AppSettingsDialog(QDialog):
         server_layout.addWidget(self.note_label)
 
         button_layout = QHBoxLayout()
-        button_layout.addWidget(self.test_button)
+        for notification_type in NOTIFICATION_TYPES:
+            button_layout.addWidget(self.test_buttons[notification_type])
         button_layout.addStretch(1)
         button_layout.addWidget(self.save_button)
         button_layout.addWidget(self.cancel_button)
@@ -270,15 +279,22 @@ class AppSettingsDialog(QDialog):
 
     def _connect_signals(self) -> None:
         self.theme_combo.currentIndexChanged.connect(self._sync_theme_preview)
-        self.test_button.clicked.connect(self._emit_test_requested)
+        for notification_type, button in self.test_buttons.items():
+            button.clicked.connect(self._build_test_request_handler(notification_type))
         self.save_button.clicked.connect(self._emit_save_requested)
         self.cancel_button.clicked.connect(self.reject)
 
     def _sync_theme_preview(self) -> None:
         self.apply_theme(self.theme_combo.currentData())
 
-    def _emit_test_requested(self) -> None:
-        self.test_requested.emit(self.settings_from_form())
+    def _emit_test_requested(self, notification_type: NotificationType) -> None:
+        self.test_requested.emit(self.settings_from_form(), notification_type)
 
     def _emit_save_requested(self) -> None:
         self.save_requested.emit(self.settings_from_form())
+
+    def _build_test_request_handler(self, notification_type: NotificationType):
+        def emit_test_request() -> None:
+            self._emit_test_requested(notification_type)
+
+        return emit_test_request

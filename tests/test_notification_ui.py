@@ -7,9 +7,10 @@ from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QApplication
 
 from local_toastd.models import NotificationPayload
+from local_toastd.notification_types import NOTIFICATION_TYPE_B, NOTIFICATION_TYPE_D
 from local_toastd.notification_ui import (
     ToastNotificationWidget,
-    palette_for_level,
+    palette_for_type,
     stack_notification_geometries,
 )
 from local_toastd.queue_manager import ManagedNotification
@@ -90,9 +91,9 @@ def test_stack_notification_geometries_places_toasts_bottom_right() -> None:
     ]
 
 
-def test_palette_for_level_returns_distinct_visual_tokens() -> None:
-    success = palette_for_level("dark", "success")
-    error = palette_for_level("light", "error")
+def test_palette_for_type_returns_distinct_visual_tokens() -> None:
+    success = palette_for_type("dark", NOTIFICATION_TYPE_B)
+    error = palette_for_type("light", NOTIFICATION_TYPE_D)
 
     assert success.accent == "#22c55e"
     assert error.accent == "#dc2626"

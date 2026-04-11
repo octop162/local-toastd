@@ -27,12 +27,7 @@ SOUND_TYPE_FILES = {
 }
 
 
-def play_notification_sound(
-    level: str,
-    *,
-    sound_type: SoundType = "gentle",
-    enabled: bool = True,
-) -> None:
+def play_notification_sound(*, sound_type: SoundType = "gentle", enabled: bool = True) -> None:
     if not enabled or sound_type == "off":
         return
 

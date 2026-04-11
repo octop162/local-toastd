@@ -6,10 +6,10 @@ duration_seconds = 10.0
 max_visible = 10
 
 [notification.sound_types]
-info = "zangeki"
-success = "taiko"
-warning = "scratch"
-error = "scratch"
+type_a = "zangeki"
+type_b = "taiko"
+type_c = "scratch"
+type_d = "scratch"
 
 [server]
 bind_host = "127.0.0.1"
