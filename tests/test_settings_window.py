@@ -76,3 +76,13 @@ def test_settings_dialog_allows_font_size_up_to_30() -> None:
     assert dialog.font_size_spin.maximum() == 30
 
     dialog.close()
+
+
+def test_settings_dialog_allows_max_visible_up_to_20() -> None:
+    get_app()
+    dialog = AppSettingsDialog(AppSettings())
+
+    assert dialog.max_visible_spin.minimum() == 1
+    assert dialog.max_visible_spin.maximum() == 20
+
+    dialog.close()

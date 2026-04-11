@@ -20,7 +20,9 @@ from PySide6.QtWidgets import (
 from .notification_types import NOTIFICATION_TYPES, NotificationType, display_label_for_type
 from .settings import (
     MAX_FONT_SIZE,
+    MAX_MAX_VISIBLE,
     MIN_FONT_SIZE,
+    MIN_MAX_VISIBLE,
     AppSettings,
     NotificationSoundSettings,
     ThemeName,
@@ -164,7 +166,7 @@ class AppSettingsDialog(QDialog):
         self.duration_spin.setSuffix(" 秒")
 
         self.max_visible_spin = QSpinBox(self)
-        self.max_visible_spin.setRange(1, 10)
+        self.max_visible_spin.setRange(MIN_MAX_VISIBLE, MAX_MAX_VISIBLE)
 
         self.note_label = QLabel(
             "待受ホストとポート番号の変更はアプリ再起動後に反映されます。",
@@ -244,7 +246,7 @@ class AppSettingsDialog(QDialog):
         for notification_type in NOTIFICATION_TYPES:
             sound_form.addRow(
                 display_label_for_type(notification_type),
-                self.sound_combos[notification_type],
+                self._build_sound_row(notification_type),
             )
 
         appearance_group = QGroupBox("表示", self)
@@ -261,8 +263,6 @@ class AppSettingsDialog(QDialog):
         server_layout.addWidget(self.note_label)
 
         button_layout = QHBoxLayout()
-        for notification_type in NOTIFICATION_TYPES:
-            button_layout.addWidget(self.test_buttons[notification_type])
         button_layout.addStretch(1)
         button_layout.addWidget(self.save_button)
         button_layout.addWidget(self.cancel_button)
@@ -282,6 +282,15 @@ class AppSettingsDialog(QDialog):
         combo.addItem("スクラッチ", "scratch")
         combo.addItem("無音", "off")
         return combo
+
+    def _build_sound_row(self, notification_type: NotificationType) -> QWidget:
+        row = QWidget(self)
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        layout.addWidget(self.sound_combos[notification_type], 1)
+        layout.addWidget(self.test_buttons[notification_type])
+        return row
 
     def _connect_signals(self) -> None:
         self.theme_combo.currentIndexChanged.connect(self._sync_theme_preview)

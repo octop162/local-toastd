@@ -30,6 +30,8 @@ SETTINGS_FILE_NAME = "settings.toml"
 MIN_FONT_SIZE = 10
 MAX_FONT_SIZE = 30
 DEFAULT_FONT_SIZE = 13
+MIN_MAX_VISIBLE = 1
+MAX_MAX_VISIBLE = 20
 
 
 @dataclass(frozen=True, slots=True)
@@ -241,7 +243,7 @@ def _coerce_duration(raw: Any) -> float:
 
 
 def _coerce_max_visible(raw: Any) -> int:
-    if isinstance(raw, int) and 1 <= raw <= 10:
+    if isinstance(raw, int) and MIN_MAX_VISIBLE <= raw <= MAX_MAX_VISIBLE:
         return raw
     _warn_invalid("max_visible", raw, DEFAULT_SETTINGS.max_visible)
     return DEFAULT_SETTINGS.max_visible

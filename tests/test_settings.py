@@ -4,6 +4,7 @@ from pathlib import Path
 
 from local_toastd.settings import (
     MAX_FONT_SIZE,
+    MAX_MAX_VISIBLE,
     DEFAULT_SETTINGS,
     AppSettings,
     NotificationSoundSettings,
@@ -53,7 +54,7 @@ sound_type = "loud"
 position = "left"
 font_size = 8
 duration_seconds = -1
-max_visible = 20
+max_visible = 21
 
 [server]
 bind_host = ""
@@ -120,6 +121,29 @@ port = 8765
     settings = load_settings(path)
 
     assert settings.font_size == MAX_FONT_SIZE
+
+
+def test_load_settings_accepts_max_visible_up_to_20(tmp_path: Path) -> None:
+    path = tmp_path / "settings.toml"
+    path.write_text(
+        """
+[notification]
+theme = "dark"
+sound_types = { type_a = "gentle", type_b = "gentle", type_c = "taiko", type_d = "zangeki" }
+position = "top_right"
+font_size = 13
+duration_seconds = 5.0
+max_visible = 20
+
+[server]
+port = 8765
+""".strip(),
+        encoding="utf-8",
+    )
+
+    settings = load_settings(path)
+
+    assert settings.max_visible == MAX_MAX_VISIBLE
 
 
 def test_load_settings_falls_back_when_legacy_sound_keys_are_used(tmp_path: Path) -> None:
